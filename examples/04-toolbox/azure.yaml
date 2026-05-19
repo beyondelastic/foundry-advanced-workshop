@@ -1,0 +1,17 @@
+name: toolbox-agent
+services:
+    toolbox-agent:
+    host: azure.ai.agent
+    language: python
+    docker:
+      path: Dockerfile
+      remoteBuild: true
+      registry:
+        name: ${AZURE_CONTAINER_REGISTRY_NAME}
+        loginServer: ${AZURE_CONTAINER_REGISTRY_LOGIN_SERVER}
+    config:
+      model:
+        name: gpt-4.1-mini
+      resources:
+        cpu: '0.25'
+        memory: 0.5Gi

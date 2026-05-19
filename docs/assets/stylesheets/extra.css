@@ -1,0 +1,11 @@
+/* Workshop custom styles */
+
+/* Slightly wider content area */
+.md-grid {
+  max-width: 1220px;
+}
+
+/* Code block tweaks */
+.highlight code {
+  font-size: 0.85em;
+}

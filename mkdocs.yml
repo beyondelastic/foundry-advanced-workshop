@@ -1,0 +1,45 @@
+site_name: Microsoft Foundry Advanced Workshop
+site_description: Advanced Microsoft Foundry workshop covering hosted agents, tools, LangGraph, and Toolbox.
+site_url: https://beyondelastic.github.io/foundry-advanced-workshop/
+repo_name: foundry-advanced-workshop
+repo_url: https://github.com/beyondelastic/foundry-advanced-workshop
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: lime
+      accent: amber
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.footer
+    - content.code.copy
+    - content.action.edit
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - tables
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+extra_css:
+  - assets/stylesheets/extra.css
+extra_javascript:
+  - assets/javascripts/external-links.js
+
+nav:
+  - Home: index.md
+  - 00 Prerequisites: 00-prereqs.md
+  - 01 Your First Hosted Agent: 01-your-first-hosted-agent.md
+  - 02 Tools & File Persistence: 02-hosted-agent-tools-and-files.md
+  - 03 LangGraph Hosted Agent: 03-langgraph-hosted-agent.md
+  - 04 Foundry Toolbox: 04-foundry-toolbox.md

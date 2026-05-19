@@ -1,0 +1,23 @@
+Patient ID: P-1001
+Name: Alice Johnson
+Age: 34
+Blood Type: A+
+Last Visit: 2025-06-10
+Conditions: Asthma
+Notes: Prescribed albuterol inhaler. Follow-up in 6 months.
+
+Patient ID: P-1002
+Name: Bob Martinez
+Age: 58
+Blood Type: O-
+Last Visit: 2025-07-22
+Conditions: Type 2 Diabetes, Hypertension
+Notes: Metformin 500mg 2x daily. Blood pressure controlled with lisinopril.
+
+Patient ID: P-1003
+Name: Carol Lee
+Age: 45
+Blood Type: B+
+Last Visit: 2025-08-05
+Conditions: None
+Notes: Annual wellness exam. All results within normal range.
