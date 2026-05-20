@@ -1,17 +1,24 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
 name: toolbox-agent
 services:
     toolbox-agent:
-    host: azure.ai.agent
-    language: python
-    docker:
-      path: Dockerfile
-      remoteBuild: true
-      registry:
-        name: ${AZURE_CONTAINER_REGISTRY_NAME}
-        loginServer: ${AZURE_CONTAINER_REGISTRY_LOGIN_SERVER}
-    config:
-      model:
-        name: gpt-4.1-mini
-      resources:
-        cpu: '0.25'
-        memory: 0.5Gi
+        project: .
+        host: azure.ai.agent
+        language: docker
+        docker:
+            remoteBuild: true
+        config:
+            container:
+                resources:
+                    cpu: "0.25"
+                    memory: 0.5Gi
+            deployments:
+                - model:
+                    format: OpenAI
+                    name: gpt-4.1-mini
+                    version: "2025-04-14"
+                  name: ""
+                  sku:
+                    capacity: 0
+                    name: ""

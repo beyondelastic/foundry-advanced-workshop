@@ -1,15 +1,15 @@
 # 04 — Foundry Toolbox
 
-Connect your hosted agent to a **Foundry Toolbox** — a managed collection of tools (Code Interpreter, Web Search, and more) exposed via an MCP (Model Context Protocol) endpoint. Your agent gains powerful capabilities without you having to build or host them.
+Connect your hosted agent to a **Foundry Toolbox** — a managed collection of tools (Code Interpreter, File Search, and more) exposed via an MCP (Model Context Protocol) endpoint. Your agent gains powerful capabilities without you having to build or host them.
 
 ---
 
 ## What you'll learn
 
 - What a Foundry Toolbox is and how it works.
-- Create a Toolbox with Code Interpreter and Web Search in the Foundry portal.
+- Create a Toolbox with Code Interpreter and File Search in the Foundry portal.
 - Connect to the Toolbox MCP endpoint using `MCPStreamableHTTPTool`.
-- Authenticate with `ToolboxAuth` (bearer token injection).
+- Authenticate with `get_bearer_token_provider` and a custom `httpx.Auth` class.
 - Mix local tools and Toolbox tools in the same agent.
 
 ---
@@ -22,7 +22,7 @@ A **Toolbox** is a managed resource in your Foundry project that bundles one or 
 flowchart LR
     Agent["Hosted Agent"] -->|MCP / Streamable HTTP| Toolbox["Foundry Toolbox"]
     Toolbox --> CI["Code Interpreter"]
-    Toolbox --> WS["Web Search (Bing)"]
+    Toolbox --> FS["File Search (RAG)"]
     Toolbox --> Custom["Custom tools (future)"]
 ```
 
@@ -31,10 +31,50 @@ Key properties:
 | Feature | Detail |
 |---------|--------|
 | Protocol | MCP (Streamable HTTP transport) |
-| Authentication | Azure AD bearer token (`cognitiveservices.azure.com/.default`) |
+| Authentication | Azure AD bearer token (`https://ai.azure.com/.default`) |
+| Required header | `Foundry-Features: Toolboxes=V1Preview` |
 | Built-in tools | Code Interpreter, Web Search (Bing), File Search |
 | Scope | Per Foundry project |
-| Endpoint format | `{project_endpoint}/toolboxes/{toolbox_name}/mcp` |
+| Endpoint format | `{project_endpoint}/toolboxes/{toolbox_name}/mcp?api-version=v1` |
+
+---
+
+## Set up the vector store
+
+File Search requires a vector store with at least one uploaded document. This lesson includes a sample clinical guidelines document in `data/clinical-guidelines.md`.
+
+### Upload via the Foundry portal
+
+1. Open your Foundry project → **Data + indexes** → **Vector stores**.
+2. Click **+ Create vector store** → name it (e.g., `workshop-guidelines`).
+3. Upload `data/clinical-guidelines.md`.
+4. Wait for processing to complete (a few seconds for this small file).
+5. Copy the vector store ID (starts with `vs_...`) — you'll need it when adding File Search to your Toolbox.
+
+### Or use the REST API
+
+```bash
+# Create vector store
+curl -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  "$PROJECT_ENDPOINT/vector_stores?api-version=2025-11-15-preview" \
+  -d '{"name":"workshop-guidelines"}'
+
+# Upload file
+curl -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@data/clinical-guidelines.md" \
+  -F "purpose=assistants" \
+  "$PROJECT_ENDPOINT/files?api-version=2025-11-15-preview"
+
+# Attach file to vector store
+curl -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  "$PROJECT_ENDPOINT/vector_stores/<VS_ID>/files?api-version=2025-11-15-preview" \
+  -d '{"file_id":"<FILE_ID>"}'
+```
 
 ---
 
@@ -48,8 +88,13 @@ Before deploying this lesson's agent, create a Toolbox in the Foundry portal:
 4. Give it a name (e.g., `workshop-toolbox`).
 5. Add tools:
    - **Code Interpreter** — executes Python code in a sandboxed environment.
-   - **Web Search** — searches the web using Bing (requires a Bing resource or Grounding with Bing Search connection).
-6. Click **Create**.
+   - **File Search** — searches through uploaded documents using vector embeddings (requires a vector store with at least one uploaded file).
+6. Click **Publish**.
+
+!!! tip "File Search requires a vector store"
+    Before adding File Search to your Toolbox, create a vector store in your
+    Foundry project and upload at least one document. The Toolbox will use this
+    vector store for semantic search over your documents.
 
 !!! tip "Toolbox name"
     Note the toolbox name — you'll need it for the `TOOLBOX_NAME` environment variable.
@@ -72,7 +117,9 @@ examples/04-toolbox/
 ├── agent.yaml         ← includes TOOLBOX_NAME env var
 ├── azure.yaml         ← azd project manifest
 ├── Dockerfile
-└── requirements.txt
+├── requirements.txt
+└── data/
+    └── clinical-guidelines.md  ← sample doc for File Search
 ```
 
 ---
@@ -88,7 +135,7 @@ import os
 from typing import Annotated
 
 import httpx
-from azure.identity import DefaultAzureCredential
+from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from dotenv import load_dotenv
 from pydantic import Field
 
@@ -107,31 +154,35 @@ client = FoundryChatClient(
 )
 
 
-class ToolboxAuth(httpx.Auth):
-    """Injects a bearer token into requests to the Toolbox MCP endpoint."""
+_TOOLBOX_FEATURES = "Toolboxes=V1Preview"
 
-    def __init__(self, credential: DefaultAzureCredential) -> None:
-        self._credential = credential
+
+class _ToolboxAuth(httpx.Auth):
+    """httpx Auth that injects a fresh bearer token on every request."""
+
+    def __init__(self, token_provider) -> None:
+        self._get_token = token_provider
 
     def auth_flow(self, request: httpx.Request):
-        token = self._credential.get_token(
-            "https://cognitiveservices.azure.com/.default"
-        )
-        request.headers["Authorization"] = f"Bearer {token.token}"
+        request.headers["Authorization"] = f"Bearer {self._get_token()}"
         yield request
 
 
 def resolve_toolbox_endpoint() -> str:
     project_endpoint = os.environ["AZURE_AI_PROJECT_ENDPOINT"].rstrip("/")
     toolbox_name = os.environ["TOOLBOX_NAME"]
-    return f"{project_endpoint}/toolboxes/{toolbox_name}/mcp"
+    return f"{project_endpoint}/toolboxes/{toolbox_name}/mcp?api-version=v1"
 
 
-auth = ToolboxAuth(credential)
-http_client = httpx.AsyncClient(auth=auth, timeout=120)
+token_provider = get_bearer_token_provider(credential, "https://ai.azure.com/.default")
+http_client = httpx.AsyncClient(
+    auth=_ToolboxAuth(token_provider),
+    headers={"Foundry-Features": _TOOLBOX_FEATURES},
+    timeout=120.0,
+)
 
 toolbox = MCPStreamableHTTPTool(
-    name="foundry_toolbox",
+    name="toolbox",
     url=resolve_toolbox_endpoint(),
     http_client=http_client,
     load_prompts=False,
@@ -151,8 +202,8 @@ async def main() -> None:
         client=client,
         instructions=(
             "You are a healthcare research assistant with access to a Foundry Toolbox. "
-            "Use the Code Interpreter tool to run Python code for data analysis and visualization. "
-            "Use the Web Search tool to find recent medical research and guidelines. "
+            "Use the File Search tool to look up clinical guidelines and evidence-based recommendations. "
+            "Use the Code Interpreter tool to run Python code for data analysis and calculations. "
             "Use the summarize_findings tool to compile your results. "
             "Always cite sources and remind the user your answers are informational only."
         ),
@@ -160,9 +211,9 @@ async def main() -> None:
         default_options={"store": False},
     )
 
+    server = ResponsesHostServer(agent)
     async with agent:
-        server = ResponsesHostServer(agent)
-        server.run()
+        await server.run_async()
 
 
 if __name__ == "__main__":
@@ -177,19 +228,32 @@ if __name__ == "__main__":
 ### 1. Toolbox authentication
 
 ```python
-class ToolboxAuth(httpx.Auth):
-    def __init__(self, credential):
-        self._credential = credential
+_TOOLBOX_FEATURES = "Toolboxes=V1Preview"
+
+
+class _ToolboxAuth(httpx.Auth):
+    def __init__(self, token_provider):
+        self._get_token = token_provider
 
     def auth_flow(self, request):
-        token = self._credential.get_token(
-            "https://cognitiveservices.azure.com/.default"
-        )
-        request.headers["Authorization"] = f"Bearer {token.token}"
+        request.headers["Authorization"] = f"Bearer {self._get_token()}"
         yield request
+
+
+token_provider = get_bearer_token_provider(credential, "https://ai.azure.com/.default")
+http_client = httpx.AsyncClient(
+    auth=_ToolboxAuth(token_provider),
+    headers={"Foundry-Features": _TOOLBOX_FEATURES},
+    timeout=120.0,
+)
 ```
 
-The Toolbox MCP endpoint requires an Azure AD bearer token scoped to `cognitiveservices.azure.com/.default`. This custom `httpx.Auth` class injects the token into every request.
+The Toolbox MCP endpoint requires:
+
+1. An Azure AD bearer token scoped to `https://ai.azure.com/.default`.
+2. The feature header `Foundry-Features: Toolboxes=V1Preview` on every request.
+
+`get_bearer_token_provider` handles token caching and refresh automatically. The custom `httpx.Auth` class injects the token into each outbound request.
 
 ### 2. Build the Toolbox endpoint URL
 
@@ -197,16 +261,16 @@ The Toolbox MCP endpoint requires an Azure AD bearer token scoped to `cognitives
 def resolve_toolbox_endpoint() -> str:
     project_endpoint = os.environ["AZURE_AI_PROJECT_ENDPOINT"].rstrip("/")
     toolbox_name = os.environ["TOOLBOX_NAME"]
-    return f"{project_endpoint}/toolboxes/{toolbox_name}/mcp"
+    return f"{project_endpoint}/toolboxes/{toolbox_name}/mcp?api-version=v1"
 ```
 
-The Toolbox MCP endpoint follows a predictable URL pattern based on your project endpoint and toolbox name.
+The Toolbox MCP endpoint follows a predictable URL pattern. The `?api-version=v1` query parameter is **required** — omitting it returns a 400 error.
 
 ### 3. Create the MCP tool
 
 ```python
 toolbox = MCPStreamableHTTPTool(
-    name="foundry_toolbox",
+    name="toolbox",
     url=resolve_toolbox_endpoint(),
     http_client=http_client,
     load_prompts=False,
@@ -215,8 +279,8 @@ toolbox = MCPStreamableHTTPTool(
 
 `MCPStreamableHTTPTool` is MAF's built-in MCP client. It connects to the Toolbox and automatically discovers all available tools (Code Interpreter, Web Search, etc.).
 
-- `load_prompts=False` — skips loading MCP prompt templates (not needed here).
-- The `http_client` carries the authentication.
+- `load_prompts=False` — **required**; the Toolbox MCP server does not implement `prompts/list`.
+- The `http_client` carries both the authentication and the feature header.
 
 ### 4. Mix local and Toolbox tools
 
@@ -234,12 +298,12 @@ You can combine local `@tool` functions and MCP tools in the same `tools` list. 
 ### 5. Async context manager
 
 ```python
+server = ResponsesHostServer(agent)
 async with agent:
-    server = ResponsesHostServer(agent)
-    server.run()
+    await server.run_async()
 ```
 
-MCP tools require async initialization (to discover available tools from the server). The `async with agent` context manager handles setup and teardown.
+MCP tools require async initialization (to discover available tools from the server). The `async with agent` context manager connects to the Toolbox, discovers tools, then starts the server. On exit it cleanly disconnects.
 
 ### 6. `agent.yaml` with `TOOLBOX_NAME`
 
@@ -263,10 +327,18 @@ The `TOOLBOX_NAME` environment variable is mapped from your Foundry project envi
 
 ```bash
 cd examples/04-toolbox
-azd ai agent init
+azd init
 ```
 
-Follow the same wizard steps as previous lessons (select existing code, Docker, your project, ACR, and model).
+Select **Use code in the current directory** → confirm the detected services. This creates the `.azure/` environment folder without scaffolding infrastructure.
+
+!!! warning "Do NOT use `azd ai agent init` for this lesson"
+    The `azd ai agent init` wizard detects the `TOOLBOX_NAME` env var and tries to
+    scaffold a full `infra/` folder with Bicep files (Bing grounding, storage, etc.).
+    This conflicts with the provided `azure.yaml` and is unnecessary since your
+    Foundry project and Toolbox already exist.
+
+    Use plain `azd init` instead to just set up the environment.
 
 !!! warning "Fix `agent.yaml` after init"
     Ensure `agent.yaml` includes all three env vars:
@@ -308,13 +380,21 @@ azd ai agent invoke --local "Use Code Interpreter to calculate the average BMI f
 
 Expected: the agent writes and executes Python code, returns the computed averages.
 
-**Web Search:**
+**File Search:**
 
 ```bash
-azd ai agent invoke --local "Search for the latest WHO guidelines on hypertension management"
+azd ai agent invoke --local "What are the LDL-C targets for a very high risk patient with established cardiovascular disease?"
 ```
 
-Expected: the agent searches the web and returns a summary with sources.
+Expected: the agent searches the clinical guidelines document and returns the target (< 1.4 mmol/L and ≥ 50% reduction).
+
+**Combining both tools:**
+
+```bash
+azd ai agent invoke --local "Look up the CHA2DS2-VASc scoring criteria, then use code interpreter to calculate the score for a 70-year-old woman with hypertension and diabetes."
+```
+
+Expected: the agent retrieves the scoring table via File Search, then uses Code Interpreter to compute the score.
 
 ### Deploy to the cloud
 
@@ -342,18 +422,21 @@ az role assignment create \
 Then invoke remotely:
 
 ```bash
-azd ai agent invoke "Search for diabetes prevalence statistics, then use Code Interpreter to create a bar chart"
+azd ai agent invoke "What are the first-line medications for hypertension according to the guidelines? Use Code Interpreter to create a comparison table."
 ```
 
 ---
 
 ## Key takeaways
 
-- A **Toolbox** bundles managed tools (Code Interpreter, Web Search) behind an MCP endpoint.
+- A **Toolbox** bundles managed tools (Code Interpreter, File Search, Web Search) behind an MCP endpoint.
 - `MCPStreamableHTTPTool` discovers and connects to Toolbox tools automatically.
-- `ToolboxAuth` injects Azure AD bearer tokens for authentication.
+- Authentication uses `get_bearer_token_provider` with scope `https://ai.azure.com/.default`.
+- The `Foundry-Features: Toolboxes=V1Preview` header is **required** on all requests.
+- The endpoint URL must include `?api-version=v1`.
+- `load_prompts=False` is mandatory (Toolbox doesn't implement `prompts/list`).
+- File Search requires a vector store with uploaded documents.
 - Local `@tool` functions and Toolbox MCP tools can be mixed in the same agent.
-- The Toolbox endpoint URL follows the pattern `{project_endpoint}/toolboxes/{name}/mcp`.
 
 ---
 
