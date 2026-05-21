@@ -323,25 +323,25 @@ The `TOOLBOX_NAME` environment variable is mapped from your Foundry project envi
 
 ## Try it
 
-### Initialize the azd environment
+### Initialize the agent
 
 ```bash
 cd examples/04-toolbox
-azd init
+azd ai agent init
 ```
 
-Select **Use code in the current directory** → confirm the detected services. This creates the `.azure/` environment folder without scaffolding infrastructure.
+The wizard will ask you to:
 
-!!! warning "Do NOT use `azd ai agent init` for this lesson"
-    The `azd ai agent init` wizard detects the `TOOLBOX_NAME` env var and tries to
-    scaffold a full `infra/` folder with Bicep files (Bing grounding, storage, etc.).
-    This conflicts with the provided `azure.yaml` and is unnecessary since your
-    Foundry project and Toolbox already exist.
-
-    Use plain `azd init` instead to just set up the environment.
+1. **Use the code in the current directory**
+2. Allow `agent.yaml` overwrite
+3. Choose **Container Image (Docker)**
+4. Select your subscription and Foundry project
+5. Enter your ACR login server (e.g. `foundrywsadvaullah.azurecr.io`)
+6. Select your existing model deployment
 
 !!! warning "Fix `agent.yaml` after init"
-    Ensure `agent.yaml` includes all three env vars:
+    `azd ai agent init` overwrites `agent.yaml` and removes custom environment variables.
+    After running init, ensure your `agent.yaml` includes **all three** env vars:
 
     ```yaml
     environment_variables:
@@ -353,12 +353,21 @@ Select **Use code in the current directory** → confirm the detected services. 
           value: ${TOOLBOX_NAME}
     ```
 
+    Without `AZURE_AI_PROJECT_ENDPOINT`, the Toolbox endpoint cannot be resolved.
+    Without `TOOLBOX_NAME`, the agent won't know which Toolbox to connect to.
+
 ### Set the Toolbox name in your environment
 
 Make sure the Toolbox exists in your Foundry project and the name matches:
 
 ```bash
-# In your .env (for local testing)
+azd env set TOOLBOX_NAME workshop-toolbox
+```
+
+This registers the variable in your azd environment so it gets injected into the agent at deploy time. For local testing, also add it to your `.env` file:
+
+```bash
+# .env (for local testing with azd ai agent run)
 TOOLBOX_NAME=workshop-toolbox
 ```
 
@@ -401,6 +410,8 @@ Expected: the agent retrieves the scoring table via File Search, then uses Code 
 ```bash
 azd deploy toolbox-agent
 ```
+
+This builds the container remotely, pushes to ACR, and deploys the agent to Foundry.
 
 After the first deploy, assign the **Foundry User** role to the agent's managed identity:
 

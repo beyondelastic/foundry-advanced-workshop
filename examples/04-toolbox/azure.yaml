@@ -18,7 +18,8 @@ services:
                     format: OpenAI
                     name: gpt-4.1-mini
                     version: "2025-04-14"
-                  name: ""
+                  name: gpt-4.1-mini
                   sku:
-                    capacity: 0
-                    name: ""
+                    capacity: 50
+                    name: Standard
+            startupCommand: python main.py
