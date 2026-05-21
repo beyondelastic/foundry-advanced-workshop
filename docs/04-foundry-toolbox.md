@@ -430,6 +430,15 @@ az role assignment create \
   --scope "$ACCOUNT_ID"
 ```
 
+!!! tip "Stale conversation after RBAC errors"
+    If you invoke the agent **before** the role assignment propagates, `azd` caches a
+    conversation ID that was never persisted server-side. Subsequent calls will fail with
+    `404 Conversation not found`. Fix it by forcing a new conversation:
+
+    ```bash
+    azd ai agent invoke --new-conversation "your prompt here"
+    ```
+
 Then invoke remotely:
 
 ```bash
