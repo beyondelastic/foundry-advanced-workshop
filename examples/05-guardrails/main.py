@@ -12,6 +12,7 @@ pre/post-processing safety checks around the model call.
 
 import json
 import os
+import re
 import sys
 
 import httpx
@@ -202,28 +203,83 @@ class ContentSafetyGuardrails:
 
 # --- Blocklist Setup ---
 
+PROHIBITED_ITEMS = [
+    ("oxycontin", "Opioid - not for BP management"),
+    ("fentanyl", "Opioid - not for BP management"),
+    ("morphine", "Opioid - not for BP management"),
+    ("ivermectin", "Not indicated for hypertension"),
+]
 
-def setup_blocklist(blocklist_client: BlocklistClient):
-    """Create a blocklist with healthcare-prohibited terms (idempotent)."""
-    # Create or update the blocklist
+
+def _get_arm_resource_id(credential) -> str:
+    """Resolve the ARM resource ID for the AI Services account."""
+    token = credential.get_token("https://management.azure.com/.default").token
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Get subscriptions
+    r = httpx.get(
+        "https://management.azure.com/subscriptions?api-version=2022-01-01",
+        headers=headers,
+    )
+    account_name = re.match(r"https://([^.]+)\.services", ACCOUNT_ENDPOINT).group(1)
+
+    # Search for the account across subscriptions
+    for sub in r.json().get("value", []):
+        sub_id = sub["subscriptionId"]
+        r2 = httpx.get(
+            f"https://management.azure.com/subscriptions/{sub_id}/providers/"
+            f"Microsoft.CognitiveServices/accounts?api-version=2024-10-01",
+            headers=headers,
+        )
+        for acct in r2.json().get("value", []):
+            if acct["name"] == account_name:
+                return acct["id"]
+
+    raise RuntimeError(f"Could not find ARM resource for account '{account_name}'")
+
+
+def _setup_arm_blocklist(credential):
+    """Create blocklist via ARM API so it appears in the Foundry portal."""
+    resource_id = _get_arm_resource_id(credential)
+    token = credential.get_token("https://management.azure.com/.default").token
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+
+    # Create the blocklist
+    httpx.put(
+        f"https://management.azure.com{resource_id}/raiBlocklists/{BLOCKLIST_NAME}"
+        f"?api-version=2024-10-01",
+        headers=headers,
+        json={"properties": {"description": "Terms prohibited in clinical decision support"}},
+    )
+
+    # Add items
+    for term, _desc in PROHIBITED_ITEMS:
+        httpx.put(
+            f"https://management.azure.com{resource_id}/raiBlocklists/{BLOCKLIST_NAME}"
+            f"/raiBlocklistItems/{term}?api-version=2024-10-01",
+            headers=headers,
+            json={"properties": {"pattern": term, "isRegex": False}},
+        )
+
+
+def setup_blocklist(blocklist_client: BlocklistClient, credential):
+    """Create blocklist in both Content Safety (for analyze_text) and ARM (for Foundry portal)."""
+    # 1. Content Safety API — used by analyze_text for runtime checking
     blocklist_client.create_or_update_text_blocklist(
         blocklist_name=BLOCKLIST_NAME,
         options={"description": "Terms prohibited in clinical decision support"},
     )
-
-    # Add prohibited items
-    prohibited_items = [
-        TextBlocklistItem(text="oxycontin", description="Opioid - not for BP management"),
-        TextBlocklistItem(text="fentanyl", description="Opioid - not for BP management"),
-        TextBlocklistItem(text="morphine", description="Opioid - not for BP management"),
-        TextBlocklistItem(text="ivermectin", description="Not indicated for hypertension"),
-    ]
-
+    items = [TextBlocklistItem(text=t, description=d) for t, d in PROHIBITED_ITEMS]
     blocklist_client.add_or_update_blocklist_items(
         blocklist_name=BLOCKLIST_NAME,
-        options=AddOrUpdateTextBlocklistItemsOptions(blocklist_items=prohibited_items),
+        options=AddOrUpdateTextBlocklistItemsOptions(blocklist_items=items),
     )
-    print(f"  Blocklist '{BLOCKLIST_NAME}' configured with {len(prohibited_items)} items")
+
+    # 2. ARM API — makes blocklist visible in Foundry portal (Guardrails → Blocklists)
+    _setup_arm_blocklist(credential)
+
+    print(f"  Blocklist '{BLOCKLIST_NAME}' configured with {len(PROHIBITED_ITEMS)} items")
+    print(f"  (visible in Foundry portal under Guardrails → Blocklists)")
 
 
 # --- Main Agent Logic ---
@@ -324,7 +380,7 @@ def main():
     )
 
     print("Setting up blocklist...")
-    setup_blocklist(blocklist_client)
+    setup_blocklist(blocklist_client, credential)
 
     # Demo scenarios
     scenarios = [
