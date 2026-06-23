@@ -43,3 +43,6 @@ nav:
   - 02 Tools & File Persistence: 02-hosted-agent-tools-and-files.md
   - 03 LangGraph Hosted Agent: 03-langgraph-hosted-agent.md
   - 04 Foundry Toolbox: 04-foundry-toolbox.md
+  - 05 Guardrails & Content Safety: 05-guardrails.md
+  - 06 FoundryIQ Knowledge: 06-foundry-iq.md
+  - 07 WebIQ Web Grounding: 07-web-iq.md
