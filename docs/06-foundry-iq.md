@@ -51,6 +51,17 @@ flowchart LR
 
 - Completed [Lesson 00 — Prerequisites](00-prereqs.md)
 - Your `.env` file with `AZURE_AI_PROJECT_ENDPOINT` and `AZURE_AI_MODEL_DEPLOYMENT_NAME`
+- **Azure AI Search** connected to your Foundry project — FoundryIQ uses AI Search as the backing store for vector stores and managed indexes
+
+!!! info "Azure AI Search is provisioned automatically"
+    If you deployed with the workshop's Bicep template (`infra/main.bicep`), an Azure AI Search instance and its connection to your Foundry project are created automatically.
+
+    If you're using your own Foundry project, add an AI Search connection manually:
+
+    1. Open your project in [Microsoft Foundry](https://ai.azure.com)
+    2. Go to **Build → Knowledge** (or **Operate → Admin → Manage all projects → your project**)
+    3. Click **Manage connections** → **Add connection** → **Azure AI Search**
+    4. Select your AI Search resource and confirm
 
 ---
 

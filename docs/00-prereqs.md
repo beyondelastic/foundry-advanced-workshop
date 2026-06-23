@@ -33,7 +33,7 @@ Source: [Hosted agents — Region availability](https://learn.microsoft.com/en-u
 | Azure subscription | [Create one for free](https://azure.microsoft.com/pricing/purchase-options/azure-account) |
 | Role | **Owner** on the subscription (or Contributor + User Access Administrator) — needed to create resources and assign roles |
 
-All other Azure resources (Foundry account, project, model deployment, ACR) are provisioned by the workshop's Bicep template.
+All other Azure resources (Foundry account, project, model deployment, Azure AI Search, ACR) are provisioned by the workshop's Bicep template.
 
 ---
 
@@ -111,6 +111,8 @@ Replace `<your-unique-name>` with a globally unique string (lowercase, no spaces
       "foundryAccountName": "foundryws-janedoe",
       "foundryProjectName": "foundryws-janedoe-project",
       "projectEndpoint": "https://foundryws-janedoe.services.ai.azure.com/api/projects/foundryws-janedoe-project",
+      "searchServiceName": "foundryws-janedoe-search",
+      "searchConnectionName": "foundryws-janedoe-aisearch",
       "acrLoginServer": "foundrywsjanedoe.azurecr.io",
       "projectPrincipalId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
     }

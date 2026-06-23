@@ -66,6 +66,38 @@ resource modelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-
 }
 
 // ──────────────────────────────────────────────
+// Azure AI Search (required for FoundryIQ / Vector Stores)
+// ──────────────────────────────────────────────
+resource searchService 'Microsoft.Search/searchServices@2025-02-01-preview' = {
+  name: '${baseName}-search'
+  location: location
+  sku: {
+    name: 'basic'
+  }
+  properties: {}
+}
+
+// Connection: Foundry Account → AI Search
+resource searchConnection 'Microsoft.CognitiveServices/accounts/connections@2025-04-01-preview' = {
+  name: '${baseName}-aisearch'
+  parent: foundryAccount
+  properties: {
+    category: 'CognitiveSearch'
+    target: searchService.properties.endpoint
+    authType: 'ApiKey'
+    isSharedToAll: true
+    credentials: {
+      key: searchService.listAdminKeys().primaryKey
+    }
+    metadata: {
+      ApiType: 'Azure'
+      ResourceId: searchService.id
+      location: searchService.location
+    }
+  }
+}
+
+// ──────────────────────────────────────────────
 // Azure Container Registry
 // ──────────────────────────────────────────────
 resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
@@ -95,6 +127,38 @@ resource acrPullAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' 
 }
 
 // ──────────────────────────────────────────────
+// RBAC: Search Index Data Contributor for project identity on AI Search
+// Required so FoundryIQ can create/manage vector store indexes.
+// ──────────────────────────────────────────────
+var searchIndexDataContributorRoleId = '8ebe5a00-799e-43f5-93ac-243d3dce84a7'
+
+resource searchDataContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(searchService.id, foundryProject.id, searchIndexDataContributorRoleId)
+  scope: searchService
+  properties: {
+    principalId: foundryProject.identity.principalId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchIndexDataContributorRoleId)
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// ──────────────────────────────────────────────
+// RBAC: Search Service Contributor for project identity on AI Search
+// Required so FoundryIQ can manage search service indexes.
+// ──────────────────────────────────────────────
+var searchServiceContributorRoleId = '7ca78c08-252a-4471-8644-bb5ff32d4ba0'
+
+resource searchServiceContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(searchService.id, foundryProject.id, searchServiceContributorRoleId)
+  scope: searchService
+  properties: {
+    principalId: foundryProject.identity.principalId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchServiceContributorRoleId)
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// ──────────────────────────────────────────────
 // RBAC: Foundry User for the project identity on the account
 // Required so the hosted agent runtime can access project storage and invoke models.
 // ──────────────────────────────────────────────
@@ -116,5 +180,7 @@ resource foundryUserAssignment 'Microsoft.Authorization/roleAssignments@2022-04-
 output foundryAccountName string = foundryAccount.name
 output foundryProjectName string = foundryProject.name
 output projectEndpoint string = 'https://${baseName}.services.ai.azure.com/api/projects/${foundryProject.name}'
+output searchServiceName string = searchService.name
+output searchConnectionName string = searchConnection.name
 output acrLoginServer string = acr.properties.loginServer
 output projectPrincipalId string = foundryProject.identity.principalId
