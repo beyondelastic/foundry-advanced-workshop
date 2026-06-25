@@ -66,7 +66,7 @@ resource modelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-
 }
 
 // ──────────────────────────────────────────────
-// Azure AI Search (required for FoundryIQ / Vector Stores)
+// Azure AI Search (required for FoundryIQ / Knowledge Bases)
 // ──────────────────────────────────────────────
 resource searchService 'Microsoft.Search/searchServices@2025-02-01-preview' = {
   name: '${baseName}-search'
@@ -74,7 +74,63 @@ resource searchService 'Microsoft.Search/searchServices@2025-02-01-preview' = {
   sku: {
     name: 'basic'
   }
-  properties: {}
+  identity: {
+    type: 'SystemAssigned'
+  }
+  properties: {
+    authOptions: {
+      aadOrApiKey: {
+        aadAuthFailureMode: 'http401WithBearerChallenge'
+      }
+    }
+  }
+}
+
+// ──────────────────────────────────────────────
+// Storage Account (for Knowledge Base blob sources)
+// ──────────────────────────────────────────────
+resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+  name: replace(baseName, '-', '')
+  location: location
+  kind: 'StorageV2'
+  sku: {
+    name: 'Standard_LRS'
+  }
+  properties: {
+    accessTier: 'Hot'
+    allowBlobPublicAccess: false
+    minimumTlsVersion: 'TLS1_2'
+  }
+}
+
+resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
+  parent: storageAccount
+  name: 'default'
+}
+
+resource knowledgeContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+  parent: blobService
+  name: 'knowledge-docs'
+}
+
+// ──────────────────────────────────────────────
+// Embedding Model Deployment (for Knowledge Source vectorization)
+// ──────────────────────────────────────────────
+resource embeddingDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-04-01-preview' = {
+  parent: foundryAccount
+  name: 'text-embedding-3-large'
+  sku: {
+    name: 'Standard'
+    capacity: 50
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: 'text-embedding-3-large'
+      version: '1'
+    }
+  }
+  dependsOn: [modelDeployment]
 }
 
 // Connection: Foundry Account → AI Search
@@ -94,6 +150,38 @@ resource searchConnection 'Microsoft.CognitiveServices/accounts/connections@2025
       ResourceId: searchService.id
       location: searchService.location
     }
+  }
+}
+
+// ──────────────────────────────────────────────
+// RBAC: Cognitive Services User for AI Search identity → Foundry Account
+// Required so AI Search can use models (embedding, chat completion) during ingestion.
+// ──────────────────────────────────────────────
+var cognitiveServicesUserRoleId = 'a97b65f3-24c7-4388-baec-2e87135dc908'
+
+resource searchCogServicesUserAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(foundryAccount.id, searchService.id, cognitiveServicesUserRoleId)
+  scope: foundryAccount
+  properties: {
+    principalId: searchService.identity.principalId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesUserRoleId)
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// ──────────────────────────────────────────────
+// RBAC: Storage Blob Data Reader for AI Search identity → Storage Account
+// Required so AI Search can read blobs during knowledge source ingestion.
+// ──────────────────────────────────────────────
+var storageBlobDataReaderRoleId = '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1'
+
+resource searchStorageBlobReaderAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, searchService.id, storageBlobDataReaderRoleId)
+  scope: storageAccount
+  properties: {
+    principalId: searchService.identity.principalId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataReaderRoleId)
+    principalType: 'ServicePrincipal'
   }
 }
 
@@ -180,7 +268,10 @@ resource foundryUserAssignment 'Microsoft.Authorization/roleAssignments@2022-04-
 output foundryAccountName string = foundryAccount.name
 output foundryProjectName string = foundryProject.name
 output projectEndpoint string = 'https://${baseName}.services.ai.azure.com/api/projects/${foundryProject.name}'
+output foundryEndpoint string = 'https://${baseName}.services.ai.azure.com/'
 output searchServiceName string = searchService.name
+output searchEndpoint string = 'https://${baseName}-search.search.windows.net'
 output searchConnectionName string = searchConnection.name
+output storageAccountName string = storageAccount.name
 output acrLoginServer string = acr.properties.loginServer
 output projectPrincipalId string = foundryProject.identity.principalId

@@ -1,44 +1,62 @@
-"""Cleanup script — removes the knowledge base vector store and registered index."""
+"""Cleanup script — removes Knowledge Base, Knowledge Sources, index, and blob data."""
 
 import os
 
-from azure.ai.projects import AIProjectClient
 from azure.identity import DefaultAzureCredential
+from azure.search.documents.indexes import SearchIndexClient
+from azure.storage.blob import BlobServiceClient
 from dotenv import load_dotenv
 
 load_dotenv()
 
-PROJECT_ENDPOINT = os.environ["AZURE_AI_PROJECT_ENDPOINT"]
-INDEX_NAME = "clinical-knowledge-base"
+SEARCH_ENDPOINT = os.environ["AZURE_SEARCH_ENDPOINT"]
+STORAGE_ACCOUNT_NAME = os.environ["AZURE_STORAGE_ACCOUNT_NAME"]
+CONTAINER_NAME = "knowledge-docs"
+KNOWLEDGE_SOURCE_BLOB = "clinical-docs-ks"
+KNOWLEDGE_SOURCE_INDEX = "lab-reference-ks"
+LAB_INDEX_NAME = "lab-reference-index"
+KNOWLEDGE_BASE_NAME = "clinical-kb"
 
 
 def main():
     credential = DefaultAzureCredential()
-    project_client = AIProjectClient(endpoint=PROJECT_ENDPOINT, credential=credential)
-    oai = project_client.get_openai_client()
+    index_client = SearchIndexClient(endpoint=SEARCH_ENDPOINT, credential=credential)
 
-    # Delete the registered index
+    # 1. Delete the knowledge base (must be deleted before knowledge sources)
     try:
-        project_client.indexes.delete(name=INDEX_NAME, version="1")
-        print(f"✓ Index '{INDEX_NAME}' deleted from project.")
+        index_client.delete_knowledge_base(KNOWLEDGE_BASE_NAME)
+        print(f"✓ Knowledge base '{KNOWLEDGE_BASE_NAME}' deleted.")
     except Exception as e:
-        print(f"Index '{INDEX_NAME}' not found or already deleted: {e}")
+        print(f"  Knowledge base '{KNOWLEDGE_BASE_NAME}' not found or already deleted: {e}")
 
-    # Delete the vector store (this also removes file associations)
-    deleted = False
-    for store in oai.vector_stores.list():
-        if store.name == INDEX_NAME:
-            # List and delete files first
-            files = oai.vector_stores.files.list(vector_store_id=store.id)
-            for f in files:
-                oai.files.delete(f.id)
-            oai.vector_stores.delete(store.id)
-            print(f"✓ Vector store '{INDEX_NAME}' (id={store.id}) and files deleted.")
-            deleted = True
-            break
+    # 2. Delete both knowledge sources
+    for ks_name in [KNOWLEDGE_SOURCE_BLOB, KNOWLEDGE_SOURCE_INDEX]:
+        try:
+            index_client.delete_knowledge_source(ks_name)
+            print(f"✓ Knowledge source '{ks_name}' deleted.")
+        except Exception as e:
+            print(f"  Knowledge source '{ks_name}' not found or already deleted: {e}")
 
-    if not deleted:
-        print(f"Vector store '{INDEX_NAME}' not found.")
+    # 3. Delete the lab reference index (created manually, not auto-managed)
+    try:
+        index_client.delete_index(LAB_INDEX_NAME)
+        print(f"✓ Search index '{LAB_INDEX_NAME}' deleted.")
+    except Exception as e:
+        print(f"  Search index '{LAB_INDEX_NAME}' not found or already deleted: {e}")
+
+    # 4. Delete blobs from the container
+    try:
+        account_url = f"https://{STORAGE_ACCOUNT_NAME}.blob.core.windows.net"
+        blob_service = BlobServiceClient(account_url=account_url, credential=credential)
+        container = blob_service.get_container_client(CONTAINER_NAME)
+        blobs = list(container.list_blobs())
+        for blob in blobs:
+            container.delete_blob(blob.name)
+        print(f"✓ Deleted {len(blobs)} blobs from container '{CONTAINER_NAME}'.")
+    except Exception as e:
+        print(f"  Blob cleanup error: {e}")
+
+    print("\nCleanup complete.")
 
 
 if __name__ == "__main__":
