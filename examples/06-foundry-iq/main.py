@@ -26,6 +26,7 @@ import os
 import sys
 import time
 from pathlib import Path
+from urllib.parse import urlparse
 
 import httpx
 from azure.identity import DefaultAzureCredential
@@ -65,10 +66,18 @@ load_dotenv()
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 
+PROJECT_ENDPOINT = os.environ["AZURE_AI_PROJECT_ENDPOINT"]
+
+# The Foundry account endpoint is the project endpoint without the
+# /api/projects/<project> path — derive it instead of requiring a separate var.
+# e.g. https://my-resource.services.ai.azure.com/api/projects/my-project
+#   →  https://my-resource.services.ai.azure.com/
+_parsed = urlparse(PROJECT_ENDPOINT)
+FOUNDRY_ENDPOINT = f"{_parsed.scheme}://{_parsed.netloc}/"
+
 SEARCH_ENDPOINT = os.environ["AZURE_SEARCH_ENDPOINT"]
 STORAGE_ACCOUNT_NAME = os.environ["AZURE_STORAGE_ACCOUNT_NAME"]
 STORAGE_RESOURCE_ID = os.environ["AZURE_STORAGE_RESOURCE_ID"]
-FOUNDRY_ENDPOINT = os.environ["AZURE_FOUNDRY_ENDPOINT"]
 MODEL_DEPLOYMENT = os.environ.get("AZURE_AI_MODEL_DEPLOYMENT_NAME", "gpt-4.1-mini")
 EMBEDDING_DEPLOYMENT = os.environ.get("AZURE_EMBEDDING_DEPLOYMENT_NAME", "text-embedding-3-large")
 

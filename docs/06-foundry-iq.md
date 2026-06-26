@@ -60,12 +60,14 @@ flowchart LR
 | Variable | Example | Source |
 |----------|---------|--------|
 | `AZURE_AI_PROJECT_ENDPOINT` | `https://foundry-xyz.services.ai.azure.com/api/projects/...` | Bicep output |
-| `AZURE_FOUNDRY_ENDPOINT` | `https://foundry-xyz.services.ai.azure.com/` | Bicep output |
 | `AZURE_SEARCH_ENDPOINT` | `https://xyz-search.search.windows.net` | Bicep output |
-| `AZURE_STORAGE_CONNECTION_STRING` | `DefaultEndpointsProtocol=https;...` | Portal → Storage Account → Access keys |
 | `AZURE_AI_MODEL_DEPLOYMENT_NAME` | `gpt-4.1-mini` | Your model deployment |
 | `AZURE_EMBEDDING_DEPLOYMENT_NAME` | `text-embedding-3-large` | Deployed by Bicep |
-| `AZURE_SEARCH_CONNECTION_NAME` | `foundry-xyz-aisearch` | Bicep output (for Phase 6) |
+| `AZURE_STORAGE_ACCOUNT_NAME` | `xyzstorage` | Bicep output |
+| `AZURE_STORAGE_RESOURCE_ID` | `/subscriptions/.../storageAccounts/xyzstorage` | Bicep output |
+
+!!! note "Derived automatically"
+    The Foundry account endpoint (model/embedding resource URL) is derived from `AZURE_AI_PROJECT_ENDPOINT` in code, so there is no separate `AZURE_FOUNDRY_ENDPOINT` variable.
 
 !!! info "Infrastructure provisioned by Bicep"
     The workshop's `infra/main.bicep` deploys:
@@ -88,9 +90,9 @@ Unlike a simple vector store + file_search pattern, a Knowledge Base is a **mana
 | Query planning | None — single search pass | LLM decomposes complex queries |
 | Source routing | N/A | `retrieval_instructions` guide source selection |
 | Answer synthesis | Model generates from raw chunks | KB synthesizes with citations (`answerSynthesis` mode) |
-| Reasoning effort | N/A | Configurable: `minimal` / `low` / `medium` |
-| Multi-source | Single vector store | Multiple knowledge sources per KB |
-| Agent integration | `file_search` tool | MCP endpoint → `MCPTool` |
+| Reasoning effort | N/A | Configurable (`minimal` / `low` / `medium`) — defaults to `low` in this lesson |
+| Multi-source | Single vector store | Multiple knowledge sources per KB (blob + search index in this lesson) |
+| Agent integration | `file_search` tool | MCP endpoint → Responses API `mcp` tool |
 
 ---
 
