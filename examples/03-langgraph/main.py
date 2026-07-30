@@ -1,25 +1,20 @@
 """Lesson 03 — LangGraph Hosted Agent.
 
 A hosted agent built with LangGraph instead of Microsoft Agent Framework.
-Demonstrates the BYO (Bring Your Own) framework pattern using the Responses
-protocol adapter.
+Uses the supported ``langchain-azure-ai[hosting]`` package: you build a
+compiled LangGraph graph and ``ResponsesHostServer`` handles all the Responses
+protocol plumbing (history, threading, streaming) — no hand-written adapter.
 """
 
 import json
 import os
 from typing import Annotated, Any
 
-from azure.ai.agentserver.responses import (
-    CreateResponse,
-    ResponseContext,
-    ResponsesAgentServerHost,
-    ResponsesServerOptions,
-    TextResponse,
-)
 from azure.identity import DefaultAzureCredential
 from dotenv import load_dotenv
+from langchain_azure_ai.agents.hosting import ResponsesHostServer
 from langchain_azure_ai.chat_models import AzureAIOpenAIApiChatModel
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, SystemMessage
 from langchain_core.tools import tool
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
@@ -86,7 +81,7 @@ tools = [lookup_patient_record, calculate_bmi]
 # ---------------------------------------------------------------------------
 
 llm = AzureAIOpenAIApiChatModel(
-    project_endpoint=os.environ["AZURE_AI_PROJECT_ENDPOINT"],
+    project_endpoint=os.environ.get("FOUNDRY_PROJECT_ENDPOINT") or os.environ["AZURE_AI_PROJECT_ENDPOINT"],
     model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
     credential=credential,
 ).bind_tools(tools)
@@ -135,56 +130,10 @@ graph = graph_builder.compile()
 # ---------------------------------------------------------------------------
 # Responses API host
 # ---------------------------------------------------------------------------
-
-app = ResponsesAgentServerHost(
-    options=ResponsesServerOptions(default_fetch_history_count=20),
-)
-
-
-@app.response_handler
-async def handle_create(
-    request: CreateResponse,
-    context: ResponseContext,
-    cancellation_signal: Any,
-):
-    """Handle incoming Responses API requests by running the LangGraph graph."""
-    # Convert conversation history to LangChain messages
-    messages: list = []
-    history = await context.get_history()
-    for item in history:
-        if hasattr(item, "role") and hasattr(item, "content"):
-            text = ""
-            for part in item.content:
-                if hasattr(part, "text"):
-                    text += part.text
-            if item.role == "user":
-                messages.append(HumanMessage(content=text))
-            elif item.role == "assistant":
-                messages.append(AIMessage(content=text))
-
-    # Add the current user message
-    user_text = await context.get_input_text()
-    messages.append(HumanMessage(content=user_text))
-
-    # Run the graph
-    result = await graph.ainvoke({"messages": messages})
-
-    # Extract the final response
-    final_message = result["messages"][-1]
-    if hasattr(final_message, "content"):
-        content = final_message.content
-        if isinstance(content, list):
-            response_text = "".join(
-                part if isinstance(part, str) else part.get("text", "")
-                for part in content
-            )
-        else:
-            response_text = content
-    else:
-        response_text = str(final_message)
-
-    return TextResponse(context, request, text=response_text)
-
+# ResponsesHostServer (from langchain-azure-ai[hosting]) takes the compiled
+# graph directly and handles Responses history, threading, and streaming.
+# The old hand-written request/response adapter is no longer needed.
 
 if __name__ == "__main__":
-    app.run()
+    port = int(os.environ.get("PORT", "8088"))
+    ResponsesHostServer(graph).run(port=port)
