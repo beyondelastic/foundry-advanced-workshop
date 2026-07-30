@@ -20,8 +20,12 @@ load_dotenv()
 
 credential = DefaultAzureCredential()
 
+# The hosted runtime injects FOUNDRY_PROJECT_ENDPOINT; fall back to
+# AZURE_AI_PROJECT_ENDPOINT for local .env-based runs.
+PROJECT_ENDPOINT = os.environ.get("FOUNDRY_PROJECT_ENDPOINT") or os.environ["AZURE_AI_PROJECT_ENDPOINT"]
+
 client = FoundryChatClient(
-    project_endpoint=os.environ["AZURE_AI_PROJECT_ENDPOINT"],
+    project_endpoint=PROJECT_ENDPOINT,
     model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
     credential=credential,
 )
@@ -52,9 +56,8 @@ class _ToolboxAuth(httpx.Auth):
 
 def resolve_toolbox_endpoint() -> str:
     """Build the Toolbox MCP endpoint URL from environment variables."""
-    project_endpoint = os.environ["AZURE_AI_PROJECT_ENDPOINT"].rstrip("/")
     toolbox_name = os.environ["TOOLBOX_NAME"]
-    return f"{project_endpoint}/toolboxes/{toolbox_name}/mcp?api-version=v1"
+    return f"{PROJECT_ENDPOINT.rstrip('/')}/toolboxes/{toolbox_name}/mcp?api-version=v1"
 
 
 token_provider = get_bearer_token_provider(credential, "https://ai.azure.com/.default")
