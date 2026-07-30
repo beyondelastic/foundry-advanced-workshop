@@ -32,7 +32,7 @@ load_dotenv()
 # --- Configuration ---
 
 PROJECT_ENDPOINT = os.environ["AZURE_AI_PROJECT_ENDPOINT"]
-MODEL = os.environ.get("AZURE_AI_MODEL_DEPLOYMENT_NAME", "gpt-4.1-mini")
+MODEL = os.environ.get("AZURE_AI_MODEL_DEPLOYMENT_NAME", "gpt-5-mini")
 # Content Safety APIs live on the account-level endpoint (same host, no /api/projects/... path)
 ACCOUNT_ENDPOINT = PROJECT_ENDPOINT.split("/api/projects")[0]
 BLOCKLIST_NAME = "healthcare-prohibited"

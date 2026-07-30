@@ -60,25 +60,23 @@ The Content Safety APIs are available through the same Cognitive Services accoun
 ```
 examples/05-guardrails/
 ├── main.py          ← guardrailed agent with all safety layers
-├── cleanup.py       ← removes the demo blocklist
-├── .env.sample      ← environment variable template
-└── .env             ← your local config (git-ignored)
+└── cleanup.py       ← removes the demo blocklist
 ```
+
+Unlike the hosted-agent lessons, this is a **plain SDK script** you run with
+`python main.py` from the workshop's root virtual environment.
 
 ---
 
 ## Environment setup
 
-```bash
-cd examples/05-guardrails
-cp .env.sample .env
-```
-
-Edit `.env` with your values:
+This lesson reuses the workspace **root `.env`** (loaded automatically via
+`load_dotenv()`), so there's nothing extra to configure — it needs only the two
+core variables every lesson uses:
 
 ```bash
 AZURE_AI_PROJECT_ENDPOINT=https://<your-account>.services.ai.azure.com/api/projects/<your-project>
-AZURE_AI_MODEL_DEPLOYMENT_NAME=gpt-4.1-mini
+AZURE_AI_MODEL_DEPLOYMENT_NAME=gpt-5-mini
 ```
 
 That's it — just the same two variables used in every other lesson. The Content Safety endpoint is derived automatically from the project endpoint (same host, without the `/api/projects/...` path).
