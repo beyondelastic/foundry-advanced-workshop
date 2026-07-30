@@ -9,7 +9,13 @@ Before starting this workshop, make sure you have the tools, access, and Azure r
 !!! danger "Hosted agents are only available in specific Azure regions"
     Choose a supported region when provisioning your resources.
 
-    **Recommended region: East US 2 or Sweden Central**
+    **Recommended region: Sweden Central or East US 2**
+
+    !!! note "AI Search capacity"
+        The Bicep template provisions an Azure AI Search service (Basic tier). If a
+        region is temporarily out of Search capacity you'll see
+        `InsufficientResourcesAvailable` during deployment — try another supported
+        region (Sweden Central has been reliable).
 
 Hosted agents are currently in **public preview** and available in these regions:
 
@@ -41,9 +47,9 @@ All other Azure resources (Foundry account, project, model deployment, Azure AI 
 
 | Tool | Minimum version | Install |
 |------|----------------|---------|
-| Python | 3.12+ | [python.org](https://www.python.org/downloads/) |
+| Python | 3.12+ (hosted agent runtime uses 3.13) | [python.org](https://www.python.org/downloads/) |
 | Azure CLI | 2.67+ | [Install Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) |
-| Azure Developer CLI (`azd`) | 1.24.0+ | [Install azd](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd) |
+| Azure Developer CLI (`azd`) | 1.28.0+ | [Install azd](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd) |
 
 Docker Desktop is **not** required — `azd deploy` builds containers remotely.
 
@@ -70,7 +76,7 @@ az account show --query "{subscription: name, id: id}" -o table
 azd ext install azure.ai.agents
 ```
 
-Verify the extension is installed (version 0.1.27-preview or later):
+Verify the extension is installed (version 1.0.0-beta.7 or later):
 
 ```bash
 azd ext list
@@ -94,7 +100,7 @@ This workshop provisions its own Foundry account, project, model deployment, and
 # Create a resource group in a supported region
 az group create \
   --name rg-foundry-advanced-workshop \
-  --location eastus2
+  --location swedencentral
 
 # Deploy all infrastructure
 az deployment group create \
@@ -161,7 +167,7 @@ Open `.env` and fill in from your deployment outputs:
 | Variable | Value from Bicep output |
 |----------|------------------------|
 | `AZURE_AI_PROJECT_ENDPOINT` | `projectEndpoint` output |
-| `AZURE_AI_MODEL_DEPLOYMENT_NAME` | The model name (e.g. `gpt-4.1-mini`) |
+| `AZURE_AI_MODEL_DEPLOYMENT_NAME` | The model name (e.g. `gpt-5-mini`) |
 
 ### 8. Start the workshop UI
 
@@ -176,7 +182,7 @@ Open [http://127.0.0.1:8000](http://127.0.0.1:8000).
 ## Verification checklist
 
 - [ ] `az account show` displays the correct subscription
-- [ ] `azd ext list` shows `azure.ai.agents` at version 0.1.27-preview or later
+- [ ] `azd ext list` shows `azure.ai.agents` at version 1.0.0-beta.7 or later
 - [ ] Python 3.12+ is active in your virtual environment (`python --version`)
 - [ ] `az deployment group show` confirms your infra deployed successfully
 - [ ] `.env` file contains your `AZURE_AI_PROJECT_ENDPOINT` and `AZURE_AI_MODEL_DEPLOYMENT_NAME`

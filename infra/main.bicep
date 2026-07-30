@@ -4,11 +4,14 @@ param location string = resourceGroup().location
 @description('Base name used to derive all resource names')
 param baseName string
 
-@description('Model to deploy (e.g. gpt-4.1-mini)')
-param modelName string = 'gpt-4.1-mini'
+@description('Model to deploy (e.g. gpt-5-mini)')
+param modelName string = 'gpt-5-mini'
 
 @description('Model version')
-param modelVersion string = '2025-04-14'
+param modelVersion string = '2025-08-07'
+
+@description('Model deployment SKU name (gpt-5 models require GlobalStandard)')
+param modelSku string = 'GlobalStandard'
 
 @description('Model deployment SKU capacity (tokens-per-minute in thousands)')
 param modelCapacity int = 50
@@ -53,7 +56,7 @@ resource modelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-
   parent: foundryAccount
   name: modelName
   sku: {
-    name: 'Standard'
+    name: modelSku
     capacity: modelCapacity
   }
   properties: {

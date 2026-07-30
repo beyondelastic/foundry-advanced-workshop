@@ -11,6 +11,13 @@ venv/
 .env
 .azure/
 
+# azd ai agent — generated per-example by `azd ai agent init` (user-specific)
+examples/*/azure.yaml
+examples/*/agent.yaml
+examples/*/.agentignore
+examples/*/.gitignore
+azd-ai-*.log
+
 # MkDocs
 site/
 

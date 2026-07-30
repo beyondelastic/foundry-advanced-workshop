@@ -17,8 +17,12 @@ load_dotenv()
 
 credential = DefaultAzureCredential()
 
+# The hosted runtime injects FOUNDRY_PROJECT_ENDPOINT; fall back to
+# AZURE_AI_PROJECT_ENDPOINT for local .env-based runs.
+project_endpoint = os.environ.get("FOUNDRY_PROJECT_ENDPOINT") or os.environ["AZURE_AI_PROJECT_ENDPOINT"]
+
 client = FoundryChatClient(
-    project_endpoint=os.environ["AZURE_AI_PROJECT_ENDPOINT"],
+    project_endpoint=project_endpoint,
     model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
     credential=credential,
 )
