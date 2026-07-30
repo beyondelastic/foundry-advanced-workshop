@@ -376,7 +376,7 @@ BMI: 29.3 (overweight)
 azd deploy langgraph-agent
 ```
 
-After the first deploy, assign the **Foundry User** role to the agent's ServiceIdentity:
+After the first deploy, assign the **Foundry User** role to the **agent identity**:
 
 ```bash
 AGENT_NAME=langgraph-agent

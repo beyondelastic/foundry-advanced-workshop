@@ -339,7 +339,7 @@ minutes.
 
 !!! success "No manual role assignment needed"
     Earlier previews required assigning the **Foundry User** role to an auto-created
-    agent *ServiceIdentity* after the first deploy. With the current tooling that step
+    **agent identity** after the first deploy. With the current tooling that step
     is **no longer required** — the Bicep template's Foundry User grant on the
     **project** identity is sufficient and the platform manages the agent's runtime
     identity. The agent invokes models immediately after deploy.
