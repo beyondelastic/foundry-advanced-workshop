@@ -2,6 +2,12 @@
 
 Ground your agent with the fastest, most token-efficient web intelligence available. **Microsoft Web IQ** is the grounding engine behind Copilot, OpenAI, and Nasdaq — a suite of AI-native APIs purpose-built for feeding fresh web knowledge into LLMs.
 
+!!! warning "Private preview — requires a Web IQ API key"
+    Microsoft Web IQ is in **private preview** (limited access). This lesson only works if
+    you have a **Web IQ API key** set as `WEBIQ_API_KEY` in your `.env`. Request access at
+    [microsoft.com/webiq](https://www.microsoft.com/en-us/webiq). Because it's in preview,
+    the `webiq` Python SDK and its API surface may change.
+
 ---
 
 ## What you'll learn
@@ -29,7 +35,7 @@ flowchart LR
 
     subgraph WebSearch["Responses API web_search"]
         Q2["User Question"] --> R["Responses API<br/>+ web_search tool"]
-        R -->|"model generates queries<br/>platform-managed"| WS["Grounding with Bing<br/>(automatic)"]
+        R -->|"model generates queries<br/>platform-managed"| WS["built-in web_search<br/>(automatic)"]
         WS -->|"full pages"| R
         R --> A2["Answer + URL Citations<br/>(model-managed)"]
     end
@@ -42,7 +48,7 @@ flowchart LR
 | Aspect | Web IQ SDK | Responses API `web_search` | Traditional Bing Grounding |
 |--------|-----------|---------------------------|---------------------------|
 | **How it works** | YOU call search, get results, inject into prompt | Model calls search automatically, manages everything | You call Bing API, parse JSON, inject into prompt |
-| **Latency** | **164ms p95** (search only) | ~2-5s (search + model combined) | ~300-500ms (search only) |
+| **Latency** | **164ms p95** (search only) | seconds — search + model (much longer with reasoning models: ~80s with gpt-5-mini in our test) | ~300-500ms (search only) |
 | **Token efficiency** | Passage extraction = minimal tokens | Platform-managed, may include full pages | You control, but raw snippets need parsing |
 | **Control** | Full: query, result count, content format, max_length | Minimal: domain filters, location, context_size | Full: query, filters, freshness |
 | **Citation** | You build from URLs in results | Built-in `url_citation` annotations | You build manually |
@@ -169,7 +175,7 @@ context = "\n\n".join(
 
 # 3. Send to model with grounding context
 response = oai_client.responses.create(
-    model="gpt-4.1-mini",
+    model="gpt-5-mini",
     instructions="Answer based ONLY on the provided context. Cite by [number].",
     input=f"Context:\n{context}\n\nQuestion: {question}",
 )
@@ -186,11 +192,11 @@ This pattern gives you:
 
 ## Step 6 — Run the demo
 
+This is a plain SDK script. With the workshop's root virtual environment active, run it
+directly — it reuses the root `.env` (project endpoint, model, and `WEBIQ_API_KEY`):
+
 ```bash
 cd examples/07-web-iq
-cp .env.sample .env
-# Edit .env with your project endpoint and Web IQ API key
-
 python main.py
 ```
 

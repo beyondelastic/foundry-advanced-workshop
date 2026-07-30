@@ -9,6 +9,9 @@ azure-identity>=1.17.0
 # Content Safety (Lesson 05 — guardrails)
 azure-ai-contentsafety>=1.0.0
 
+# Web IQ (Lesson 07 — private preview SDK)
+webiq>=0.1.0
+
 # Azure AI Search (Knowledge Bases — Lesson 06)
 azure-search-documents --pre
 azure-storage-blob>=12.20.0

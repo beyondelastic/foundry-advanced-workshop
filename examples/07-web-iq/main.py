@@ -2,7 +2,7 @@
 
 Demonstrates Microsoft Web IQ — a high-performance grounding API that provides
 fresh, structured web intelligence to AI applications. Unlike the Responses API's
-built-in `web_search` tool (Grounding with Bing), Web IQ gives YOU the results
+built-in `web_search` tool, Web IQ gives YOU the results
 so you control exactly what context reaches the model.
 
 The script:
@@ -28,7 +28,7 @@ load_dotenv()
 # --- Configuration ---
 
 PROJECT_ENDPOINT = os.environ["AZURE_AI_PROJECT_ENDPOINT"]
-MODEL = os.environ.get("AZURE_AI_MODEL_DEPLOYMENT_NAME", "gpt-4.1-mini")
+MODEL = os.environ.get("AZURE_AI_MODEL_DEPLOYMENT_NAME", "gpt-5-mini")
 WEBIQ_API_KEY = os.environ["WEBIQ_API_KEY"]
 
 SYSTEM_INSTRUCTIONS = """You are a clinical decision-support assistant.
@@ -299,7 +299,7 @@ def main():
     print("  • Web IQ: Separate search APIs (web, news, video, images, browse)")
     print("  • web_search: Simpler (one tool declaration, model manages everything)")
     print("  • web_search: Built-in citations (url_citation annotations)")
-    print("  • web_search: Uses Grounding with Bing under the hood")
+    print("  • web_search: Built-in tool — the model runs the search for you")
     print(f"{'='*70}")
 
 
