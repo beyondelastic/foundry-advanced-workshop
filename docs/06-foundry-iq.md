@@ -61,7 +61,7 @@ flowchart LR
 |----------|---------|--------|
 | `AZURE_AI_PROJECT_ENDPOINT` | `https://foundry-xyz.services.ai.azure.com/api/projects/...` | Bicep output |
 | `AZURE_SEARCH_ENDPOINT` | `https://xyz-search.search.windows.net` | Bicep output |
-| `AZURE_AI_MODEL_DEPLOYMENT_NAME` | `gpt-4.1-mini` | Your model deployment |
+| `AZURE_AI_MODEL_DEPLOYMENT_NAME` | `gpt-5-mini` | Your model deployment |
 | `AZURE_EMBEDDING_DEPLOYMENT_NAME` | `text-embedding-3-large` | Deployed by Bicep |
 | `AZURE_STORAGE_ACCOUNT_NAME` | `xyzstorage` | Bicep output |
 | `AZURE_STORAGE_RESOURCE_ID` | `/subscriptions/.../storageAccounts/xyzstorage` | Bicep output |
@@ -77,6 +77,38 @@ flowchart LR
     - **text-embedding-3-large** model deployment
     - RBAC: Search → Cognitive Services User (on Foundry, for model access)
     - RBAC: Search → Storage Blob Data Reader (on Storage, for blob indexing)
+
+!!! warning "Assign yourself data-plane roles (required)"
+    The Bicep grants the roles above to the **Search service's** identity. This lesson's
+    script runs as **you**, so you also need your own data-plane roles on the Search and
+    Storage resources. Assign them once:
+
+    ```bash
+    export BASE_NAME=<your-unique-name>
+    export RESOURCE_GROUP=rg-foundry-advanced-workshop
+    ME=$(az ad signed-in-user show --query id -o tsv)
+    SUB=$(az account show --query id -o tsv)
+    SEARCH="/subscriptions/$SUB/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Search/searchServices/${BASE_NAME}-search"
+    STORAGE="/subscriptions/$SUB/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$(echo $BASE_NAME | tr -d '-')"
+
+    az role assignment create --assignee $ME --role "Storage Blob Data Contributor" --scope "$STORAGE"
+    az role assignment create --assignee $ME --role "Search Service Contributor"     --scope "$SEARCH"
+    az role assignment create --assignee $ME --role "Search Index Data Contributor"  --scope "$SEARCH"
+    ```
+
+    RBAC can take 1–2 minutes to propagate.
+
+!!! warning "Storage account must allow public network access"
+    Knowledge Base ingestion reads your documents over the storage account's **public
+    endpoint** (both your local script and the Search service). If your tenant's Azure
+    Policy provisions the account with `publicNetworkAccess: Disabled`, enable it:
+
+    ```bash
+    az storage account update -n <storage-account> -g $RESOURCE_GROUP \
+      --public-network-access Enabled
+    ```
+
+    The account uses AAD auth (`DefaultAzureCredential`), so `allowSharedKeyAccess: false` is fine.
 
 ---
 
