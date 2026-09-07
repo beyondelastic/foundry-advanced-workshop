@@ -2,7 +2,7 @@
 
 A docs-first advanced workshop covering **hosted agents**, **guardrails**, and **advanced retrieval & web grounding** in Microsoft Foundry.
 
-This is the sequel to the [beginner Foundry workshop](https://beyondelastic.github.io/foundry-workshop/). It assumes you already have a Foundry resource, project, and model deployment.
+This workshop builds on the [beginner Foundry workshop](https://beyondelastic.github.io/foundry-workshop/), but you do not need to complete it first. The [Prerequisites](docs/00-prereqs.md) lesson provisions the required Foundry account, project, model deployment, and supporting Azure resources using Bicep.
 
 **Topics covered:**
 
