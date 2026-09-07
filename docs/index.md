@@ -2,7 +2,7 @@
 
 Welcome to an advanced, docs-first Microsoft Foundry workshop focused on **hosted agents**.
 
-This workshop is the sequel to the [beginner Foundry workshop](https://beyondelastic.github.io/foundry-workshop/). It assumes you already have a Foundry resource, project, and model deployment. If you don't, complete the beginner workshop first.
+This workshop builds on the [beginner Foundry workshop](https://beyondelastic.github.io/foundry-workshop/), but you do not need to complete it first. The [Prerequisites](00-prereqs.md) lesson provisions the required Foundry account, project, model deployment, and supporting Azure resources using Bicep.
 
 The examples use lightweight healthcare and life-sciences scenarios so the workshop stays consistent across all lessons. Every exercise is based on official Microsoft documentation and the [microsoft-foundry/foundry-samples](https://github.com/microsoft-foundry/foundry-samples) repository.
 
