@@ -7,6 +7,7 @@ demonstrates per-session file persistence on the hosted agent sandbox.
 import json
 import os
 from datetime import datetime
+from pathlib import Path
 from typing import Annotated
 
 from azure.identity import DefaultAzureCredential
@@ -97,11 +98,11 @@ def save_session_note(
     Files saved here persist for the lifetime of the session but are
     isolated from other sessions.
     """
-    notes_dir = "/mnt/user/notes"
-    os.makedirs(notes_dir, exist_ok=True)
+    notes_dir = Path.home() / "notes"
+    notes_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(notes_dir, f"note_{timestamp}.txt")
-    with open(filepath, "w") as f:
+    filepath = notes_dir / f"note_{timestamp}.txt"
+    with filepath.open("w") as f:
         f.write(note)
     return f"Note saved to {filepath}"
 
@@ -109,18 +110,17 @@ def save_session_note(
 @tool(approval_mode="never_require")
 def list_session_notes() -> str:
     """List all notes saved in the current session."""
-    notes_dir = "/mnt/user/notes"
-    if not os.path.exists(notes_dir):
+    notes_dir = Path.home() / "notes"
+    if not notes_dir.exists():
         return "No notes found."
-    files = sorted(os.listdir(notes_dir))
+    files = sorted(notes_dir.iterdir())
     if not files:
         return "No notes found."
     results = []
-    for fname in files:
-        filepath = os.path.join(notes_dir, fname)
-        with open(filepath, "r") as f:
+    for filepath in files:
+        with filepath.open("r") as f:
             content = f.read()
-        results.append(f"--- {fname} ---\n{content}")
+        results.append(f"--- {filepath.name} ---\n{content}")
     return "\n\n".join(results)
 
 

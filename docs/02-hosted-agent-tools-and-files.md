@@ -8,7 +8,7 @@ Add custom tools and per-session file storage to your hosted agent. The agent ca
 
 - Define custom tools with the `@tool` decorator.
 - Pass structured parameters with type annotations and Pydantic `Field` descriptions.
-- Use the per-session sandbox filesystem (`/mnt/user/`) for file persistence.
+- Use the per-session sandbox filesystem (`$HOME`) for file persistence.
 - Understand session isolation — files written in one session are not visible in another.
 
 ---
@@ -42,11 +42,11 @@ sequenceDiagram
 
 ## Per-session file persistence
 
-Hosted agents have access to a **per-session sandbox filesystem** mounted at `/mnt/user/`. Key properties:
+Hosted agents map `$HOME` to a **per-session persistent filesystem**. Key properties:
 
 | Property | Detail |
 |----------|--------|
-| Mount path | `/mnt/user/` |
+| Persistent path | `$HOME` |
 | Scope | Per session — each conversation gets its own filesystem |
 | Lifetime | Persists for the lifetime of the session |
 | Isolation | Other sessions cannot read or write to this session's files |
@@ -82,6 +82,7 @@ examples/02-tools-and-files/
 import json
 import os
 from datetime import datetime
+from pathlib import Path
 from typing import Annotated
 
 from azure.identity import DefaultAzureCredential
@@ -155,11 +156,11 @@ def save_session_note(
     note: Annotated[str, Field(description="The note text to save")],
 ) -> str:
     """Save a note to the per-session sandbox filesystem."""
-    notes_dir = "/mnt/user/notes"
-    os.makedirs(notes_dir, exist_ok=True)
+    notes_dir = Path.home() / "notes"
+    notes_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(notes_dir, f"note_{timestamp}.txt")
-    with open(filepath, "w") as f:
+    filepath = notes_dir / f"note_{timestamp}.txt"
+    with filepath.open("w") as f:
         f.write(note)
     return f"Note saved to {filepath}"
 
@@ -167,18 +168,17 @@ def save_session_note(
 @tool(approval_mode="never_require")
 def list_session_notes() -> str:
     """List all notes saved in the current session."""
-    notes_dir = "/mnt/user/notes"
-    if not os.path.exists(notes_dir):
+    notes_dir = Path.home() / "notes"
+    if not notes_dir.exists():
         return "No notes found."
-    files = sorted(os.listdir(notes_dir))
+    files = sorted(notes_dir.iterdir())
     if not files:
         return "No notes found."
     results = []
-    for fname in files:
-        filepath = os.path.join(notes_dir, fname)
-        with open(filepath, "r") as f:
+    for filepath in files:
+        with filepath.open("r") as f:
             content = f.read()
-        results.append(f"--- {fname} ---\n{content}")
+        results.append(f"--- {filepath.name} ---\n{content}")
     return "\n\n".join(results)
 
 
@@ -233,12 +233,12 @@ The `lookup_patient_record` tool simulates a database query with a dictionary of
 ```python
 @tool(approval_mode="never_require")
 def save_session_note(note: Annotated[str, Field(description="The note text to save")]) -> str:
-    notes_dir = "/mnt/user/notes"
-    os.makedirs(notes_dir, exist_ok=True)
+    notes_dir = Path.home() / "notes"
+    notes_dir.mkdir(parents=True, exist_ok=True)
     ...
 ```
 
-The `/mnt/user/` path is the per-session sandbox. Files written here:
+Foundry maps `$HOME` to the per-session sandbox. Files written beneath it:
 
 - Persist across turns within the same session.
 - Are isolated from other sessions.
@@ -318,8 +318,8 @@ Expected:
 BMI: 26.8 (overweight)
 ```
 
-!!! note "File persistence tools won't work locally"
-    The `/mnt/user/` sandbox filesystem is only available on the hosted platform. The `save_session_note` and `list_session_notes` tools will fail locally — test them after deploying to the cloud.
+!!! note "Local file behavior"
+    The tools also work locally, but use your local home directory. Session isolation and persistence across hosted sandbox restarts apply only after deployment to Foundry.
 
 ### Deploy to the cloud
 
@@ -333,7 +333,7 @@ No manual agent-identity role assignment is needed (see [lesson 01](01-your-firs
 azd ai agent invoke "Look up patient P-1002 and calculate their BMI if weight is 95kg and height 1.80m"
 ```
 
-### Test file persistence (cloud only)
+### Test hosted file persistence
 
 ```bash
 azd ai agent invoke "Save a note: Patient P-1001 follow-up scheduled for December."
@@ -364,7 +364,7 @@ You have one session note saved: "Patient P-1001 follow-up scheduled for Decembe
 
 - `@tool` turns any Python function into a tool the agent can call.
 - Pydantic `Field(description=...)` helps the model understand parameters.
-- `/mnt/user/` provides per-session file persistence on hosted agents.
+- `$HOME` provides per-session file persistence on hosted agents.
 - Each session has its own isolated sandbox filesystem.
 - Tools are registered as a list in the `Agent` constructor.
 
